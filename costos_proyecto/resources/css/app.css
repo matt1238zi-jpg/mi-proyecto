@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* opcional */
+:root{ --brand:#6366f1; }
+.btn-soft{ @apply px-4 py-2 rounded-xl bg-indigo-500 text-white hover:opacity-90 transition; }
+.card{ @apply rounded-2xl p-8 shadow bg-white/80; }
