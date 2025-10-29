@@ -59,7 +59,7 @@
     <a href="{{ route('admin.usuarios.index') }}" class="card card-link">
   <h4>Usuarios del sistema</h4>
   <div class="num">{{ number_format($totalUsuarios) }}</div>
-  <div class="muted">Huéspedes: {{ number_format($totalHuespedes) }}</div>
+
 </a>
 
 <a href="{{ route('admin.habitaciones.estado') }}" class="card card-link">

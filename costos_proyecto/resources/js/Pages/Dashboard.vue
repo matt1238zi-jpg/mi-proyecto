@@ -9,6 +9,7 @@ const recientes = ref([])
 const role = ref(0)
 const error = ref('')
 
+
 const load = async () => {
   loading.value = true
   error.value = ''
@@ -23,6 +24,94 @@ const load = async () => {
     loading.value = false
   }
 }
+//nuevo codigo
+const usersOpen = ref(false)
+const users = ref([])
+const usersLoading = ref(false)
+const usersQ = ref('')
+const usersPage = ref(1)
+const usersMeta = ref({}) // pagination meta
+
+const userFormOpen = ref(false)
+const userSaving = ref(false)
+const userMsg = ref('')
+const editingId = ref(null)
+const userForm = ref({
+  nombre_completo: '', email: '', username: '',
+  password: '', password_confirmation: '',
+  role_id: 2, activo: true,
+})
+async function loadUsers(page = 1){
+  usersLoading.value = true
+  userMsg.value = ''
+  try{
+    const { data } = await axios.get('/api/users', { params: { q: usersQ.value, page } })
+    users.value = data.data
+    usersMeta.value = data
+    usersPage.value = page
+  }catch(e){
+    userMsg.value = 'No se pudo cargar usuarios'
+  }finally{
+    usersLoading.value = false
+  }
+}
+function openUsers(){
+  usersOpen.value = true
+  loadUsers()
+}
+function newUser(){
+  editingId.value = null
+  userMsg.value = ''
+  userForm.value = {
+    nombre_completo: '', email:'', username:'',
+    password:'', password_confirmation:'',
+    role_id: 2, activo: true,
+  }
+  userFormOpen.value = true
+}
+function editUser(u){
+  editingId.value = u.id
+  userMsg.value = ''
+  userForm.value = {
+    nombre_completo: u.nombre_completo ?? '',
+    email: u.email ?? '',
+    username: u.username ?? '',
+    password: '',
+    password_confirmation: '',
+    role_id: u.role_id ?? 2,
+    activo: !!u.activo,
+  }
+  userFormOpen.value = true
+}
+async function saveUser(){
+  userSaving.value = true
+  userMsg.value = ''
+  try{
+    if(editingId.value){
+      const payload = {...userForm.value}
+      if(!payload.password) { delete payload.password; delete payload.password_confirmation }
+      await axios.patch(`/api/users/${editingId.value}`, payload)
+    }else{
+      await axios.post('/api/users', userForm.value)
+    }
+    userFormOpen.value = false
+    await loadUsers(usersPage.value)
+  }catch(e){
+    userMsg.value = e.response?.data?.message || 'No se pudo guardar'
+  }finally{
+    userSaving.value = false
+  }
+}
+async function removeUser(u){
+  if(!confirm(`¿Eliminar usuario "${u.nombre_completo}"?`)) return
+  try{
+    await axios.delete(`/api/users/${u.id}`)
+    await loadUsers(usersPage.value)
+  }catch(e){
+    alert(e.response?.data?.msg || 'No se pudo eliminar')
+  }
+}
+//fin
 
 onMounted(() => {
   load()
@@ -107,10 +196,15 @@ async function doLogout () {
 </script>
 
 <template>
+    
   <div class="min-h-screen bg-[#f6f7fb]">
     <div class="mx-auto max-w-6xl px-4 py-8">
       <!-- Encabezado -->
       <div class="mb-6 flex items-center justify-between">
+        <button v-if="role !== 2" @click="openUsers"
+          class="px-3 py-2 rounded-xl bg-white shadow text-gray-700 hover:bg-gray-50">
+    Usuarios
+        </button>
         <div>
           <h1 class="text-3xl font-semibold">Inicio</h1>
           <p class="text-sm text-gray-500">Resumen general de tus proyectos</p>
@@ -272,6 +366,144 @@ async function doLogout () {
       </div>
     </div>
   </div>
+  
+<!-- MODAL: Usuarios -->
+<div v-if="usersOpen" class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-40">
+  <div class="w-full max-w-4xl rounded-2xl bg-white shadow-lg p-6 animate-fade-in-up">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold">Usuarios</h3>
+      <button class="text-gray-500 hover:text-gray-700" @click="usersOpen=false">✕</button>
+    </div>
+
+    <div class="flex items-center gap-2 mb-3">
+      <input v-model="usersQ" @keyup.enter="loadUsers(1)" placeholder="Buscar..."
+             class="flex-1 rounded-xl border px-3 py-2" />
+      <button class="px-3 py-2 rounded-xl bg-gray-100 hover:bg-gray-200" @click="loadUsers(1)">Filtrar</button>
+      <button class="px-3 py-2 rounded-xl bg-indigo-500 text-white hover:opacity-90" @click="newUser">+ Nuevo</button>
+    </div>
+
+    <p v-if="userMsg" class="text-sm text-red-600 mb-2">{{ userMsg }}</p>
+
+    <div class="rounded-2xl border overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600">
+          <tr>
+            <th class="p-2 text-left">Nombre</th>
+            <th class="p-2 text-left">Email</th>
+            <th class="p-2 text-left">Usuario</th>
+            <th class="p-2 text-center">Rol</th>
+            <th class="p-2 text-center">Activo</th>
+            <th class="p-2 text-right w-40"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="usersLoading"><td colspan="6" class="p-4 text-center text-gray-500">Cargando…</td></tr>
+          <tr v-for="u in users" :key="u.id" class="border-t">
+            <td class="p-2">{{ u.nombre_completo }}</td>
+            <td class="p-2">{{ u.email }}</td>
+            <td class="p-2">{{ u.username }}</td>
+            <td class="p-2 text-center">
+              <span class="px-2 py-1 rounded-full text-xs"
+                    :class="u.role_id===1 ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-700'">
+                {{ u.role_id===1 ? 'Admin' : 'Usuario' }}
+              </span>
+            </td>
+            <td class="p-2 text-center">
+              <span class="px-2 py-1 rounded-full text-xs"
+                    :class="u.activo ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'">
+                {{ u.activo ? 'Sí' : 'No' }}
+              </span>
+            </td>
+            <td class="p-2 text-right">
+              <button class="text-indigo-600 mr-3" @click="editUser(u)">Editar</button>
+              <button class="text-rose-600" @click="removeUser(u)">Eliminar</button>
+            </td>
+          </tr>
+          <tr v-if="!usersLoading && users.length===0">
+            <td colspan="6" class="p-4 text-center text-gray-500">Sin usuarios.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- paginación simple -->
+    <div class="flex items-center justify-between mt-3 text-sm">
+      <div>Total: {{ usersMeta?.total ?? 0 }}</div>
+      <div class="flex items-center gap-2">
+        <button class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                :disabled="(usersMeta?.current_page ?? 1) <= 1"
+                @click="loadUsers((usersMeta?.current_page ?? 1) - 1)">Anterior</button>
+        <span>Página {{ usersMeta?.current_page ?? 1 }} / {{ usersMeta?.last_page ?? 1 }}</span>
+        <button class="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                :disabled="(usersMeta?.current_page ?? 1) >= (usersMeta?.last_page ?? 1)"
+                @click="loadUsers((usersMeta?.current_page ?? 1) + 1)">Siguiente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Crear/Editar usuario -->
+<div v-if="userFormOpen" class="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+  <div class="w-full max-w-lg rounded-2xl bg-white shadow-lg p-6 animate-fade-in-up">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold">{{ editingId ? 'Editar usuario' : 'Nuevo usuario' }}</h3>
+      <button class="text-gray-500 hover:text-gray-700" @click="userFormOpen=false">✕</button>
+    </div>
+
+    <div class="grid gap-3">
+      <div>
+        <label class="text-sm text-gray-600">Nombre completo</label>
+        <input v-model="userForm.nombre_completo" class="w-full rounded-xl border px-3 py-2" />
+      </div>
+      <div>
+        <label class="text-sm text-gray-600">Email</label>
+        <input v-model="userForm.email" type="email" class="w-full rounded-xl border px-3 py-2" />
+      </div>
+      <div>
+        <label class="text-sm text-gray-600">Usuario</label>
+        <input v-model="userForm.username" class="w-full rounded-xl border px-3 py-2" />
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-sm text-gray-600">Rol</label>
+          <select v-model.number="userForm.role_id" class="w-full rounded-xl border px-3 py-2">
+            <option :value="1">Admin</option>
+            <option :value="2">Usuario</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" v-model="userForm.activo" class="rounded"> Activo
+          </label>
+        </div>
+      </div>
+
+      <details>
+        <summary class="cursor-pointer text-sm text-gray-600">
+          {{ editingId ? 'Cambiar contraseña' : 'Contraseña' }}
+        </summary>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+          <input type="password" v-model="userForm.password" class="rounded-xl border px-3 py-2" placeholder="Nueva contraseña" />
+          <input type="password" v-model="userForm.password_confirmation" class="rounded-xl border px-3 py-2" placeholder="Confirmar contraseña" />
+        </div>
+      </details>
+
+      <p v-if="userMsg" class="text-sm text-red-600">{{ userMsg }}</p>
+
+      <div class="pt-2 flex justify-end gap-2">
+        <button class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200" @click="userFormOpen=false">Cancelar</button>
+        <button :disabled="userSaving" class="px-4 py-2 rounded-xl bg-indigo-500 text-white hover:opacity-90 disabled:opacity-60" @click="saveUser">
+          {{ userSaving ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
 </template>
 
 <style>

@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProyectoController;
 use App\Http\Controllers\PresupuestoController;
+use App\Http\Controllers\RecursoImportController;
 // Home: si está logueado -> /dashboard; si no -> /auth
 Route::get('/', function () {
     return auth()->check()
@@ -48,8 +49,6 @@ Route::post('/api/proyectos', [ProyectoController::class, 'store'])
     ->name('api.proyectos.store');
     Route::get('/api/proyectos', [ProyectoController::class, 'index'])->name('api.proyectos.index');
 
-Route::get('/proyectos/{proyecto}/presupuesto', [PresupuestoController::class, 'editor'])
-    ->name('proyectos.editor');
 
 // API Presupuesto
 Route::prefix('api/proyectos/{proyecto}')->group(function () {
@@ -62,5 +61,25 @@ Route::post('/api/partidas/{partida}/apu',       [PresupuestoController::class, 
 Route::post('/api/apu/{apu}/lineas',             [PresupuestoController::class, 'lineaAdd']);   // agrega insumo a APU
 Route::patch('/api/apu/lineas/{linea}',          [PresupuestoController::class, 'lineaUpdate']); // cantidad / precio
 Route::delete('/api/apu/lineas/{linea}',         [PresupuestoController::class, 'lineaDelete']); // borra línea
+Route::post('/api/recursos/import', [RecursoImportController::class, 'import'])
+     ->name('api.recursos.import');
+// Rutas para administrador
+    Route::middleware('admin')->group(function () {
+        Route::get('/admin', [AdminController::class, 'index'])->name('admin.dashboard');
+        Route::get('/admin/usuarios', [AdminController::class, 'usuarios']);
+        Route::get('/admin/proyectos', [AdminController::class, 'proyectos']);
+    });
+ Route::get('/users',        [UserController::class, 'index']);    // ?q= & page=
+    Route::post('/users',       [UserController::class, 'store']);    // crear
+    Route::patch('/users/{id}', [UserController::class, 'update']);   // editar
+    Route::delete('/users/{id}',[UserController::class, 'destroy']);  // eliminar
+use App\Http\Controllers\Admin\UserController; // <— IMPORTANTE
 
+// --------- API: Usuarios (CRUD) ----------
+Route::prefix('api')->group(function () {
+    Route::get('/users',        [UserController::class, 'index']);   // ?q=&page=
+    Route::post('/users',       [UserController::class, 'store']);
+    Route::patch('/users/{id}', [UserController::class, 'update']);
+    Route::delete('/users/{id}',[UserController::class, 'destroy']);
+});
 });
